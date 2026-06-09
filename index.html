@@ -3,16 +3,16 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>גלריה — Picture Wheel</title>
+<title>Proximity Wheel</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  :root { --bg: #0a0a0c; --bg2: #15151a; }
   html, body { width: 100%; height: 100%; overflow: hidden; }
   body {
     background: #ffffff;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
-    -webkit-font-smoothing: antialiased;
   }
+
+  /* ── WHEEL STAGE ── */
   #stage {
     position: fixed; inset: 0;
     perspective: 1500px;
@@ -24,37 +24,124 @@
     position: absolute; left: 50%; top: 50%;
     width: 0; height: 0;
     transform-style: preserve-3d;
+    transition: transform 0.05s linear;
   }
-  .blade { position: absolute; transform-style: preserve-3d; will-change: transform, opacity; }
+  .blade {
+    position: absolute;
+    transform-style: preserve-3d;
+    will-change: transform, opacity;
+  }
   .face {
     position: absolute; inset: 0;
-    border-radius: 0; overflow: hidden; background: #fff;
-    box-shadow: none;
-    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    overflow: hidden; background: #fff;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
   }
   .face.back { transform: rotateY(180deg); }
-  .face.back .ss { transform: scaleX(-1); }
-  .ss { position: absolute; inset: 0; display: flex; flex-direction: column; }
-  .ss-bar {
-    height: 26px; flex: 0 0 26px; background: #f1f1f3;
-    display: flex; align-items: center; gap: 6px; padding: 0 12px;
-    border-bottom: 1px solid #e6e6ea;
+
+  /* ── FULLSCREEN OVERLAY ── */
+  #overlay {
+    position: fixed; inset: 0;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0;
   }
-  .ss-dot { width: 8px; height: 8px; border-radius: 50%; background: #d6d6dc; }
-  .ss-body { flex: 1; padding: 18px; position: relative; overflow: hidden; }
-  .ss-hero { border-radius: 8px; width: 100%; height: 46%; }
-  .ss-line { height: 9px; border-radius: 5px; background: #e9e9ee; margin-top: 12px; }
-  .ss-row { display: flex; gap: 10px; margin-top: 14px; }
-  .ss-tile { flex: 1; height: 52px; border-radius: 7px; background: #eef0f3; }
-  .ss-num { font-weight: 800; letter-spacing: -.02em; }
-  .ss-pill { display:inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; color:#fff; }
-  #hint {
-    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
-    color: rgba(255,255,255,.4); font-size: 12.5px; letter-spacing: .14em;
-    text-transform: uppercase; font-weight: 600; pointer-events: none; transition: opacity .6s ease;
+  #overlay.open {
+    pointer-events: all;
   }
+  #overlay-card {
+    position: absolute;
+    left: 0; right: 0;
+    /* starts at bottom, slides up */
+    bottom: -100%;
+    width: 100%;
+    height: 100%;
+    transition: bottom 0.7s cubic-bezier(0.32, 0.72, 0, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #overlay.open #overlay-card {
+    bottom: 0;
+  }
+  #overlay-bg {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0);
+    transition: background 0.7s ease;
+  }
+  #overlay.open #overlay-bg {
+    background: rgba(0,0,0,0.15);
+  }
+  #overlay-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+  #overlay-color {
+    position: absolute; inset: 0;
+  }
+  #overlay-label {
+    position: absolute;
+    bottom: 48px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: clamp(18px, 4vw, 40px);
+    font-weight: 700;
+    color: rgba(255,255,255,0.9);
+    letter-spacing: 0.08em;
+    text-shadow: 0 2px 16px rgba(0,0,0,0.3);
+    white-space: nowrap;
+  }
+
+  /* ── STATUS INDICATOR ── */
+  #status {
+    position: fixed;
+    top: 20px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(10px);
+    padding: 8px 18px;
+    border-radius: 100px;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    transition: opacity 0.4s;
+  }
+  #status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #555;
+    transition: background 0.3s;
+  }
+  #status-dot.active { background: #4ade80; }
+  #status-dot.detected { background: #f59e0b; }
+  #status-dot.close { background: #ef4444; animation: pulse 1s infinite; }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ── WEBCAM (hidden) ── */
+  #webcam {
+    position: fixed;
+    bottom: 8px; right: 8px;
+    width: 120px; height: 90px;
+    object-fit: cover;
+    border-radius: 8px;
+    opacity: 0.3;
+    z-index: 50;
+    display: none;
+  }
+  #webcam.show { display: block; }
+
+  /* ── PANEL ── */
   .panel {
-    position: fixed; top: 18px; right: 18px; width: 230px; z-index: 50;
+    position: fixed; top: 18px; right: 18px; width: 230px; z-index: 150;
     background: rgba(20,20,26,.82); backdrop-filter: blur(10px);
     border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 16px 16px 6px;
     color: #e8e8ee;
@@ -72,154 +159,386 @@
 </style>
 </head>
 <body>
-  <div id="stage"><div id="ring"></div></div>
-  <div id="hint">drag to spin</div>
-  <div class="panel">
-    <h2>Picture Wheel</h2>
-    <div class="ctrl">
-      <label>Spin speed <span id="vSpeed">7°/s</span></label>
-      <input id="speed" type="range" min="0" max="40" step="1" value="7">
-    </div>
-    <div class="ctrl">
-      <label>Direction</label>
-      <div class="seg">
-        <button id="dirR" class="on">Right</button>
-        <button id="dirL">Left</button>
-      </div>
-    </div>
-    <div class="ctrl">
-      <label>Pictures <span id="vCount">40</span></label>
-      <input id="count" type="range" min="12" max="60" step="1" value="40">
-    </div>
-    <div class="ctrl">
-      <label>Hub size <span id="vInner">18px</span></label>
-      <input id="inner" type="range" min="0" max="180" step="2" value="18">
-    </div>
-    <div class="ctrl">
-      <label>Card width <span id="vCardW">300px</span></label>
-      <input id="cardW" type="range" min="180" max="420" step="5" value="300">
-    </div>
-    <div class="ctrl">
-      <label>Card height <span id="vCardH">200px</span></label>
-      <input id="cardH" type="range" min="120" max="1920" step="5" value="200">
-    </div>
-    <div class="ctrl">
-      <label>Tilt <span id="vTilt">-8°</span></label>
-      <input id="tilt" type="range" min="-30" max="10" step="1" value="-8">
-    </div>
-    <div class="ctrl">
-      <label>Rotate <span id="vRotate">0°</span></label>
-      <input id="rotate" type="range" min="-180" max="180" step="1" value="0">
+
+<div id="stage"><div id="ring"></div></div>
+
+<!-- fullscreen overlay -->
+<div id="overlay">
+  <div id="overlay-bg"></div>
+  <div id="overlay-card">
+    <div id="overlay-inner">
+      <div id="overlay-color"></div>
+      <div id="overlay-label"></div>
     </div>
   </div>
+</div>
 
-  <script>
-  (function () {
-    const stage = document.getElementById('stage');
-    const ring  = document.getElementById('ring');
-    const hint  = document.getElementById('hint');
-    const CFG = { count: 40, inner: 18, cardW: 300, cardH: 200, tilt: -8, speed: 7, direction: 1, rotate: 0 };
-    const ACCENTS = ['#E8756A','#7AB648','#9370DB','#F4A460','#5BA8E0','#E85A8A','#2EC4A6','#F2C14E'];
+<!-- status bar -->
+<div id="status">
+  <div id="status-dot"></div>
+  <span id="status-text">Starting camera...</span>
+</div>
 
-    function screenshot(i) {
-      const color = `hsl(${(i / 40) * 360}, 72%, 58%)`;
-      return `<div style="position:absolute;inset:0;background:${color}"></div>`;
+<!-- hidden webcam -->
+<video id="webcam" autoplay muted playsinline></video>
+
+<!-- control panel -->
+<div class="panel">
+  <h2>Proximity Wheel</h2>
+  <div class="ctrl">
+    <label>Spin speed <span id="vSpeed">7°/s</span></label>
+    <input id="speed" type="range" min="0" max="40" step="1" value="7">
+  </div>
+  <div class="ctrl">
+    <label>Direction</label>
+    <div class="seg">
+      <button id="dirR" class="on">Right</button>
+      <button id="dirL">Left</button>
+    </div>
+  </div>
+  <div class="ctrl">
+    <label>Pictures <span id="vCount">40</span></label>
+    <input id="count" type="range" min="12" max="60" step="1" value="40">
+  </div>
+  <div class="ctrl">
+    <label>Card width <span id="vCardW">300px</span></label>
+    <input id="cardW" type="range" min="180" max="1920" step="5" value="300">
+  </div>
+  <div class="ctrl">
+    <label>Card height <span id="vCardH">200px</span></label>
+    <input id="cardH" type="range" min="120" max="1920" step="5" value="200">
+  </div>
+  <div class="ctrl">
+    <label>Tilt <span id="vTilt">-8°</span></label>
+    <input id="tilt" type="range" min="-30" max="10" step="1" value="-8">
+  </div>
+  <div class="ctrl">
+    <label>Rotate <span id="vRotate">0°</span></label>
+    <input id="rotate" type="range" min="-180" max="180" step="1" value="0">
+  </div>
+  <div class="ctrl">
+    <label>Proximity threshold <span id="vProx">0.18</span></label>
+    <input id="prox" type="range" min="0.05" max="0.5" step="0.01" value="0.18">
+  </div>
+  <div class="ctrl">
+    <label>Show camera</label>
+    <div class="seg">
+      <button id="camOn">Show</button>
+      <button id="camOff" class="on">Hide</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { FaceLandmarker, FilesetResolver }
+  from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
+
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const CFG = {
+  count: 40, inner: 18, cardW: 300, cardH: 200,
+  tilt: -8, speed: 7, direction: 1, rotate: 0,
+  proxThreshold: 0.18,   // face width as fraction of frame → ≈1.5m away
+};
+
+const COLORS = ['#E8756A','#7AB648','#9370DB','#F4A460','#5BA8E0','#E85A8A','#2EC4A6','#F2C14E'];
+const LABELS = ['Coral','Forest','Violet','Peach','Sky','Rose','Teal','Gold'];
+
+// ── WHEEL ────────────────────────────────────────────────────────────────────
+const stage = document.getElementById('stage');
+const ring  = document.getElementById('ring');
+let blades = [];
+
+function makeCard(i) {
+  const color = COLORS[i % COLORS.length];
+  const label = LABELS[i % LABELS.length];
+  const el = document.createElement('div');
+  el.className = 'face';
+  el.style.background = color;
+  el.style.display = 'flex';
+  el.style.alignItems = 'center';
+  el.style.justifyContent = 'center';
+  el.style.fontSize = 'clamp(14px,2.5vw,28px)';
+  el.style.fontWeight = '700';
+  el.style.color = 'rgba(255,255,255,0.7)';
+  el.style.letterSpacing = '0.08em';
+  el.dataset.color = color;
+  el.dataset.label = label;
+  return el;
+}
+
+function build() {
+  ring.innerHTML = ''; blades = [];
+  const R = CFG.inner + CFG.cardW / 2;
+  for (let i = 0; i < CFG.count; i++) {
+    const a = (i / CFG.count) * 360;
+    const b = document.createElement('div');
+    b.className = 'blade';
+    b.style.width  = CFG.cardW + 'px';
+    b.style.height = CFG.cardH + 'px';
+    b.style.marginLeft = (-CFG.cardW / 2) + 'px';
+    b.style.marginTop  = (-CFG.cardH / 2) + 'px';
+    b.style.transform  = `rotateY(${a - 90}deg) translateX(${R}px)`;
+    const front = makeCard(i);
+    const back  = document.createElement('div');
+    back.className = 'face back';
+    back.style.background = front.style.background;
+    b.appendChild(front);
+    b.appendChild(back);
+    ring.appendChild(b);
+    blades.push({ el: b, a });
+  }
+}
+build();
+
+// ── SPIN LOOP ────────────────────────────────────────────────────────────────
+let spin = 0, velocity = 0, dragging = false, last = performance.now();
+let wheelFrozen = false;   // true when person is close
+let freezeSpin  = 0;       // spin value at freeze moment
+
+function applyOpacity() {
+  for (const bl of blades) {
+    const p = (bl.a + spin) * Math.PI / 180;
+    const c = Math.cos(p);
+    const op = c > -0.15 ? 1 : Math.max(0, 1 + (c + 0.15) * 2.2);
+    bl.el.style.opacity = op.toFixed(3);
+  }
+}
+
+function tick(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+
+  if (!wheelFrozen && !dragging) {
+    if (Math.abs(velocity) > 0.01) {
+      spin += velocity * dt;
+      velocity *= Math.pow(0.12, dt);
+      if (Math.abs(velocity) < CFG.speed) velocity = 0;
+    } else {
+      spin += CFG.speed * CFG.direction * dt;
     }
+  }
 
-    let blades = [];
-    function build() {
-      ring.innerHTML = ''; blades = [];
-      const R = CFG.inner + CFG.cardW / 2;
-      for (let i = 0; i < CFG.count; i++) {
-        const a = (i / CFG.count) * 360;
-        const b = document.createElement('div');
-        b.className = 'blade';
-        b.style.width = CFG.cardW + 'px';
-        b.style.height = CFG.cardH + 'px';
-        b.style.marginLeft = (-CFG.cardW / 2) + 'px';
-        b.style.marginTop = (-CFG.cardH / 2) + 'px';
-        b.style.transform = `rotateY(${a - 90}deg) translateX(${R}px)`;
-        const art = screenshot(i);
-        const f = document.createElement('div'); f.className = 'face'; f.innerHTML = art;
-        const bk = document.createElement('div'); bk.className = 'face back'; bk.innerHTML = art;
-        b.appendChild(f); b.appendChild(bk);
-        ring.appendChild(b);
-        blades.push({ el: b, a });
-      }
-    }
+  ring.style.transform =
+    `rotateZ(${CFG.rotate}deg) rotateX(${CFG.tilt}deg) rotateY(${spin}deg)`;
+  applyOpacity();
+}
+function loop(now) { tick(now); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
 
-    let spin = 0, velocity = 0, dragging = false, last = performance.now();
+// ── DRAG ─────────────────────────────────────────────────────────────────────
+let downX = 0, downSpin = 0, lastX = 0, lastT = 0;
+stage.addEventListener('pointerdown', e => {
+  if (wheelFrozen) return;
+  dragging = true; velocity = 0;
+  downX = lastX = e.clientX; downSpin = spin; lastT = performance.now();
+  stage.classList.add('dragging');
+  stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  const dx = e.clientX - downX;
+  spin = downSpin + dx * 0.35;
+  const now = performance.now(); const dt = (now - lastT) / 1000;
+  if (dt > 0) velocity = ((e.clientX - lastX) * 0.35) / dt;
+  lastX = e.clientX; lastT = now;
+});
+function endDrag() { if (!dragging) return; dragging = false; stage.classList.remove('dragging'); }
+stage.addEventListener('pointerup', endDrag);
+stage.addEventListener('pointercancel', endDrag);
 
-    function applyOpacity() {
-      for (const bl of blades) {
-        const p = (bl.a + spin) * Math.PI / 180;
-        const c = Math.cos(p);
-        const op = c > -0.15 ? 1 : Math.max(0, 1 + (c + 0.15) * 2.2);
-        bl.el.style.opacity = op.toFixed(3);
-      }
-    }
+// ── OVERLAY (FULLSCREEN CARD) ─────────────────────────────────────────────────
+const overlay     = document.getElementById('overlay');
+const overlayCard = document.getElementById('overlay-card');
+const overlayCol  = document.getElementById('overlay-color');
+const overlayLbl  = document.getElementById('overlay-label');
 
-    function tick(now) {
-      const dt = Math.min(0.05, (now - last) / 1000); last = now;
-      if (!dragging) {
-        if (Math.abs(velocity) > 0.01) {
-          spin += velocity * dt;
-          velocity *= Math.pow(0.12, dt);
-          if (Math.abs(velocity) < CFG.speed) velocity = 0;
-        } else {
-          spin += CFG.speed * CFG.direction * dt;
-        }
-      }
-      ring.style.transform = `rotateZ(${CFG.rotate}deg) rotateX(${CFG.tilt}deg) rotateY(${spin}deg)`;
-      applyOpacity();
-    }
-    function loop(now) { tick(now); requestAnimationFrame(loop); }
+// Get the card closest to center (rotateY ≈ 0 in current spin)
+function getCenterCard() {
+  let best = null, bestDist = Infinity;
+  for (const bl of blades) {
+    // effective angle in degrees, normalized to [-180, 180]
+    let eff = ((bl.a + spin) % 360 + 360) % 360;
+    if (eff > 180) eff -= 360;
+    const dist = Math.abs(eff);
+    if (dist < bestDist) { bestDist = dist; best = bl; }
+  }
+  return best;
+}
 
-    let downX = 0, downSpin = 0, lastX = 0, lastT = 0;
-    stage.addEventListener('pointerdown', (e) => {
-      dragging = true; velocity = 0;
-      downX = lastX = e.clientX; downSpin = spin; lastT = performance.now();
-      stage.classList.add('dragging');
-      stage.setPointerCapture(e.pointerId);
-      if (hint) hint.style.opacity = '0';
+let overlayOpen = false;
+
+function openOverlay() {
+  if (overlayOpen) return;
+  overlayOpen = true;
+
+  const center = getCenterCard();
+  const front  = center ? center.el.querySelector('.face:not(.back)') : null;
+  const color  = front?.dataset.color || '#9370DB';
+  const label  = front?.dataset.label || '';
+
+  overlayCol.style.background = color;
+  overlayLbl.textContent = label;
+
+  // start below screen (already set by CSS), then trigger transition
+  overlay.style.opacity = '1';
+  overlay.classList.add('open');
+}
+
+function closeOverlay() {
+  if (!overlayOpen) return;
+  overlayOpen = false;
+  overlay.classList.remove('open');
+  // after transition ends, reset
+  setTimeout(() => { overlay.style.opacity = '0'; }, 700);
+}
+
+// ── PROXIMITY via MediaPipe ───────────────────────────────────────────────────
+const statusDot  = document.getElementById('status-dot');
+const statusText = document.getElementById('status-text');
+const webcamEl   = document.getElementById('webcam');
+
+// Face width threshold: empirically ~0.18 of frame width ≈ 1.5m for typical webcam
+// (adjust with the slider)
+let PROX = CFG.proxThreshold;
+
+// Hysteresis to avoid flickering
+const CLOSE_FRAMES_NEEDED = 8;   // frames face must be large before triggering
+const FAR_FRAMES_NEEDED   = 20;  // frames face must be gone/small before reverting
+let closeFrames = 0;
+let farFrames   = 0;
+let personClose = false;
+
+async function startCamera() {
+  try {
+    statusText.textContent = 'Loading MediaPipe…';
+
+    const fs = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
+    );
+    const fl = await FaceLandmarker.createFromOptions(fs, {
+      baseOptions: {
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+        delegate: 'GPU',
+      },
+      outputFaceBlendshapes: false,
+      runningMode: 'VIDEO',
+      numFaces: 1,
     });
-    stage.addEventListener('pointermove', (e) => {
-      if (!dragging) return;
-      const dx = e.clientX - downX;
-      spin = downSpin + dx * 0.35;
-      const now = performance.now(); const dt = (now - lastT) / 1000;
-      if (dt > 0) velocity = ((e.clientX - lastX) * 0.35) / dt;
-      lastX = e.clientX; lastT = now;
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } }
     });
-    function endDrag() { if (!dragging) return; dragging = false; stage.classList.remove('dragging'); }
-    stage.addEventListener('pointerup', endDrag);
-    stage.addEventListener('pointercancel', endDrag);
+    webcamEl.srcObject = stream;
+    await new Promise(r => { webcamEl.onloadeddata = r; });
 
-    const bind = (id, valId, fmt, fn, rebuild) => {
-      const el = document.getElementById(id);
-      el.addEventListener('input', () => {
-        const v = parseFloat(el.value);
-        if (valId) document.getElementById(valId).textContent = fmt(v);
-        fn(v); if (rebuild) build();
-      });
-    };
-    bind('speed', 'vSpeed', v => v + '°/s', v => CFG.speed = v);
-    bind('count', 'vCount', v => v,         v => CFG.count = Math.round(v), true);
-    bind('inner', 'vInner', v => v + 'px',  v => CFG.inner = v, true);
-    bind('cardW', 'vCardW', v => v + 'px',  v => CFG.cardW = v, true);
-    bind('cardH', 'vCardH', v => v + 'px',  v => CFG.cardH = v, true);
-    bind('tilt',  'vTilt',  v => v + '°',   v => CFG.tilt = v);
-    bind('rotate','vRotate',v => v + '°',   v => CFG.rotate = v);
+    statusDot.className = 'active';
+    statusText.textContent = 'Camera active';
 
-    const dirR = document.getElementById('dirR'), dirL = document.getElementById('dirL');
-    dirR.onclick = () => { CFG.direction = 1;  velocity = 0; dirR.classList.add('on'); dirL.classList.remove('on'); };
-    dirL.onclick = () => { CFG.direction = -1; velocity = 0; dirL.classList.add('on'); dirR.classList.remove('on'); };
+    let lastCamT = -1;
 
-    build();
-    tick(performance.now());
-    requestAnimationFrame(loop);
-    setInterval(() => { if (!document.hidden) tick(performance.now()); }, 33);
-  })();
-  </script>
+    function trackFace() {
+      if (webcamEl.readyState >= 2 && webcamEl.currentTime !== lastCamT) {
+        lastCamT = webcamEl.currentTime;
+
+        try {
+          const res = fl.detectForVideo(webcamEl, performance.now());
+          const landmarks = res.faceLandmarks;
+
+          if (landmarks && landmarks.length > 0) {
+            const lm = landmarks[0];
+
+            // Estimate face width using left/right cheek landmarks
+            // lm[234] = left cheek, lm[454] = right cheek (normalized 0-1)
+            const lChk = lm[234], rChk = lm[454];
+            const faceWidth = Math.abs(rChk.x - lChk.x);
+
+            const isClose = faceWidth >= PROX;
+
+            if (isClose) {
+              closeFrames++;
+              farFrames = 0;
+              statusDot.className = closeFrames >= CLOSE_FRAMES_NEEDED ? 'close' : 'detected';
+              statusText.textContent = `Face: ${(faceWidth * 100).toFixed(0)}% — ${isClose ? 'CLOSE' : 'near'}`;
+            } else {
+              farFrames++;
+              closeFrames = 0;
+              statusDot.className = 'active';
+              statusText.textContent = `Face: ${(faceWidth * 100).toFixed(0)}%`;
+            }
+
+            // Trigger open
+            if (!personClose && closeFrames >= CLOSE_FRAMES_NEEDED) {
+              personClose = true;
+              wheelFrozen = true;
+              freezeSpin  = spin;
+              openOverlay();
+            }
+            // Trigger close
+            if (personClose && farFrames >= FAR_FRAMES_NEEDED) {
+              personClose = false;
+              wheelFrozen = false;
+              closeOverlay();
+            }
+
+          } else {
+            // No face detected
+            closeFrames = 0;
+            farFrames++;
+            statusDot.className = farFrames > 5 ? '' : 'active';
+            statusText.textContent = farFrames > 5 ? 'No face' : 'Camera active';
+
+            if (personClose && farFrames >= FAR_FRAMES_NEEDED) {
+              personClose = false;
+              wheelFrozen = false;
+              closeOverlay();
+            }
+          }
+        } catch (_) {}
+      }
+      requestAnimationFrame(trackFace);
+    }
+    requestAnimationFrame(trackFace);
+
+  } catch (e) {
+    statusDot.className = '';
+    statusText.textContent = 'Camera unavailable';
+    console.warn('[camera]', e);
+  }
+}
+
+startCamera();
+
+// ── CONTROLS ─────────────────────────────────────────────────────────────────
+const bind = (id, valId, fmt, fn, rebuild) => {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => {
+    const v = parseFloat(el.value);
+    if (valId) document.getElementById(valId).textContent = fmt(v);
+    fn(v); if (rebuild) build();
+  });
+};
+bind('speed',   'vSpeed',  v => v + '°/s', v => CFG.speed = v);
+bind('count',   'vCount',  v => v,         v => { CFG.count = Math.round(v); build(); });
+bind('cardW',   'vCardW',  v => v + 'px',  v => { CFG.cardW = v; build(); });
+bind('cardH',   'vCardH',  v => v + 'px',  v => { CFG.cardH = v; build(); });
+bind('tilt',    'vTilt',   v => v + '°',   v => CFG.tilt = v);
+bind('rotate',  'vRotate', v => v + '°',   v => CFG.rotate = v);
+bind('prox',    'vProx',   v => v.toFixed(2), v => { PROX = v; CFG.proxThreshold = v; });
+
+const dirR = document.getElementById('dirR'), dirL = document.getElementById('dirL');
+dirR.onclick = () => { CFG.direction =  1; velocity = 0; dirR.classList.add('on'); dirL.classList.remove('on'); };
+dirL.onclick = () => { CFG.direction = -1; velocity = 0; dirL.classList.add('on'); dirR.classList.remove('on'); };
+
+document.getElementById('camOn').onclick  = () => {
+  webcamEl.classList.add('show');
+  document.getElementById('camOn').classList.add('on');
+  document.getElementById('camOff').classList.remove('on');
+};
+document.getElementById('camOff').onclick = () => {
+  webcamEl.classList.remove('show');
+  document.getElementById('camOff').classList.add('on');
+  document.getElementById('camOn').classList.remove('on');
+};
+
+</script>
 </body>
 </html>
