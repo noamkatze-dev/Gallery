@@ -171,6 +171,14 @@
     <input id="cardH" type="range" min="120" max="1920" step="5" value="200">
   </div>
   <div class="ctrl">
+    <label>Tilt <span id="vTilt">-8°</span></label>
+    <input id="tilt" type="range" min="-30" max="10" step="1" value="-8">
+  </div>
+  <div class="ctrl">
+    <label>Rotate <span id="vRotate">0°</span></label>
+    <input id="rotate" type="range" min="-180" max="180" step="1" value="0">
+  </div>
+  <div class="ctrl">
     <label>Proximity <span id="vProx">0.18</span></label>
     <input id="prox" type="range" min="0.05" max="0.5" step="0.01" value="0.18">
   </div>
@@ -498,6 +506,8 @@ bind('speed',   'vSpeed',   v=>parseFloat(v), v=>CFG.speed=v);
 bind('count',   'vCount',   v=>parseInt(v),   v=>{CFG.count=v;build();});
 bind('cardW',   'vCardW',   v=>parseInt(v),   v=>{CFG.cardW=v;build();}, );
 bind('cardH',   'vCardH',   v=>parseInt(v),   v=>{CFG.cardH=v;build();});
+bind('tilt',    'vTilt',    v=>v+'°',         v=>CFG.tilt=v);
+bind('rotate',  'vRotate',  v=>v+'°',         v=>CFG.rotate=v);
 bind('prox',    'vProx',    v=>parseFloat(v), v=>PROX=v);
 bind('dotSize', 'vDotSize', v=>parseInt(v),   v=>TRK.dotSize=v);
 bind('trail',   'vTrail',   v=>parseInt(v),   v=>TRK.trail=v);
