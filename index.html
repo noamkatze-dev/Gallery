@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>גלריה — Picture Wheel</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root { --bg: #0a0a0c; --bg2: #15151a; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    background: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #stage {
+    position: fixed; inset: 0;
+    perspective: 1500px;
+    perspective-origin: 50% 48%;
+    cursor: grab; touch-action: none;
+  }
+  #stage.dragging { cursor: grabbing; }
+  #ring {
+    position: absolute; left: 50%; top: 50%;
+    width: 0; height: 0;
+    transform-style: preserve-3d;
+  }
+  .blade { position: absolute; transform-style: preserve-3d; will-change: transform, opacity; }
+  .face {
+    position: absolute; inset: 0;
+    border-radius: 0; overflow: hidden; background: #fff;
+    box-shadow: none;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  }
+  .face.back { transform: rotateY(180deg); }
+  .face.back .ss { transform: scaleX(-1); }
+  .ss { position: absolute; inset: 0; display: flex; flex-direction: column; }
+  .ss-bar {
+    height: 26px; flex: 0 0 26px; background: #f1f1f3;
+    display: flex; align-items: center; gap: 6px; padding: 0 12px;
+    border-bottom: 1px solid #e6e6ea;
+  }
+  .ss-dot { width: 8px; height: 8px; border-radius: 50%; background: #d6d6dc; }
+  .ss-body { flex: 1; padding: 18px; position: relative; overflow: hidden; }
+  .ss-hero { border-radius: 8px; width: 100%; height: 46%; }
+  .ss-line { height: 9px; border-radius: 5px; background: #e9e9ee; margin-top: 12px; }
+  .ss-row { display: flex; gap: 10px; margin-top: 14px; }
+  .ss-tile { flex: 1; height: 52px; border-radius: 7px; background: #eef0f3; }
+  .ss-num { font-weight: 800; letter-spacing: -.02em; }
+  .ss-pill { display:inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; color:#fff; }
+  #hint {
+    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+    color: rgba(255,255,255,.4); font-size: 12.5px; letter-spacing: .14em;
+    text-transform: uppercase; font-weight: 600; pointer-events: none; transition: opacity .6s ease;
+  }
+  .panel {
+    position: fixed; top: 18px; right: 18px; width: 230px; z-index: 50;
+    background: rgba(20,20,26,.82); backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 16px 16px 6px;
+    color: #e8e8ee;
+  }
+  .panel h2 { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; opacity: .6; margin-bottom: 14px; }
+  .ctrl { margin-bottom: 13px; }
+  .ctrl label { display: flex; justify-content: space-between; font-size: 12px; opacity: .8; margin-bottom: 6px; }
+  .ctrl input[type=range] { width: 100%; accent-color: #9370DB; }
+  .seg { display: flex; gap: 6px; }
+  .seg button {
+    flex: 1; padding: 6px 0; font-size: 12px; border-radius: 8px; cursor: pointer;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); color: #e8e8ee;
+  }
+  .seg button.on { background: #9370DB; border-color: #9370DB; color: #fff; }
+</style>
+</head>
+<body>
+  <div id="stage"><div id="ring"></div></div>
+  <div id="hint">drag to spin</div>
+  <div class="panel">
+    <h2>Picture Wheel</h2>
+    <div class="ctrl">
+      <label>Spin speed <span id="vSpeed">7°/s</span></label>
+      <input id="speed" type="range" min="0" max="40" step="1" value="7">
+    </div>
+    <div class="ctrl">
+      <label>Direction</label>
+      <div class="seg">
+        <button id="dirR" class="on">Right</button>
+        <button id="dirL">Left</button>
+      </div>
+    </div>
+    <div class="ctrl">
+      <label>Pictures <span id="vCount">40</span></label>
+      <input id="count" type="range" min="12" max="60" step="1" value="40">
+    </div>
+    <div class="ctrl">
+      <label>Hub size <span id="vInner">18px</span></label>
+      <input id="inner" type="range" min="0" max="180" step="2" value="18">
+    </div>
+    <div class="ctrl">
+      <label>Card width <span id="vCardW">300px</span></label>
+      <input id="cardW" type="range" min="180" max="420" step="5" value="300">
+    </div>
+    <div class="ctrl">
+      <label>Card height <span id="vCardH">200px</span></label>
+      <input id="cardH" type="range" min="120" max="1920" step="5" value="200">
+    </div>
+    <div class="ctrl">
+      <label>Tilt <span id="vTilt">-8°</span></label>
+      <input id="tilt" type="range" min="-30" max="10" step="1" value="-8">
+    </div>
+    <div class="ctrl">
+      <label>Rotate <span id="vRotate">0°</span></label>
+      <input id="rotate" type="range" min="-180" max="180" step="1" value="0">
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    const stage = document.getElementById('stage');
+    const ring  = document.getElementById('ring');
+    const hint  = document.getElementById('hint');
+    const CFG = { count: 40, inner: 18, cardW: 300, cardH: 200, tilt: -8, speed: 7, direction: 1, rotate: 0 };
+    const ACCENTS = ['#E8756A','#7AB648','#9370DB','#F4A460','#5BA8E0','#E85A8A','#2EC4A6','#F2C14E'];
+
+    function screenshot(i) {
+      const color = `hsl(${(i / 40) * 360}, 72%, 58%)`;
+      return `<div style="position:absolute;inset:0;background:${color}"></div>`;
+    }
+
+    let blades = [];
+    function build() {
+      ring.innerHTML = ''; blades = [];
+      const R = CFG.inner + CFG.cardW / 2;
+      for (let i = 0; i < CFG.count; i++) {
+        const a = (i / CFG.count) * 360;
+        const b = document.createElement('div');
+        b.className = 'blade';
+        b.style.width = CFG.cardW + 'px';
+        b.style.height = CFG.cardH + 'px';
+        b.style.marginLeft = (-CFG.cardW / 2) + 'px';
+        b.style.marginTop = (-CFG.cardH / 2) + 'px';
+        b.style.transform = `rotateY(${a - 90}deg) translateX(${R}px)`;
+        const art = screenshot(i);
+        const f = document.createElement('div'); f.className = 'face'; f.innerHTML = art;
+        const bk = document.createElement('div'); bk.className = 'face back'; bk.innerHTML = art;
+        b.appendChild(f); b.appendChild(bk);
+        ring.appendChild(b);
+        blades.push({ el: b, a });
+      }
+    }
+
+    let spin = 0, velocity = 0, dragging = false, last = performance.now();
+
+    function applyOpacity() {
+      for (const bl of blades) {
+        const p = (bl.a + spin) * Math.PI / 180;
+        const c = Math.cos(p);
+        const op = c > -0.15 ? 1 : Math.max(0, 1 + (c + 0.15) * 2.2);
+        bl.el.style.opacity = op.toFixed(3);
+      }
+    }
+
+    function tick(now) {
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      if (!dragging) {
+        if (Math.abs(velocity) > 0.01) {
+          spin += velocity * dt;
+          velocity *= Math.pow(0.12, dt);
+          if (Math.abs(velocity) < CFG.speed) velocity = 0;
+        } else {
+          spin += CFG.speed * CFG.direction * dt;
+        }
+      }
+      ring.style.transform = `rotateZ(${CFG.rotate}deg) rotateX(${CFG.tilt}deg) rotateY(${spin}deg)`;
+      applyOpacity();
+    }
+    function loop(now) { tick(now); requestAnimationFrame(loop); }
+
+    let downX = 0, downSpin = 0, lastX = 0, lastT = 0;
+    stage.addEventListener('pointerdown', (e) => {
+      dragging = true; velocity = 0;
+      downX = lastX = e.clientX; downSpin = spin; lastT = performance.now();
+      stage.classList.add('dragging');
+      stage.setPointerCapture(e.pointerId);
+      if (hint) hint.style.opacity = '0';
+    });
+    stage.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - downX;
+      spin = downSpin + dx * 0.35;
+      const now = performance.now(); const dt = (now - lastT) / 1000;
+      if (dt > 0) velocity = ((e.clientX - lastX) * 0.35) / dt;
+      lastX = e.clientX; lastT = now;
+    });
+    function endDrag() { if (!dragging) return; dragging = false; stage.classList.remove('dragging'); }
+    stage.addEventListener('pointerup', endDrag);
+    stage.addEventListener('pointercancel', endDrag);
+
+    const bind = (id, valId, fmt, fn, rebuild) => {
+      const el = document.getElementById(id);
+      el.addEventListener('input', () => {
+        const v = parseFloat(el.value);
+        if (valId) document.getElementById(valId).textContent = fmt(v);
+        fn(v); if (rebuild) build();
+      });
+    };
+    bind('speed', 'vSpeed', v => v + '°/s', v => CFG.speed = v);
+    bind('count', 'vCount', v => v,         v => CFG.count = Math.round(v), true);
+    bind('inner', 'vInner', v => v + 'px',  v => CFG.inner = v, true);
+    bind('cardW', 'vCardW', v => v + 'px',  v => CFG.cardW = v, true);
+    bind('cardH', 'vCardH', v => v + 'px',  v => CFG.cardH = v, true);
+    bind('tilt',  'vTilt',  v => v + '°',   v => CFG.tilt = v);
+    bind('rotate','vRotate',v => v + '°',   v => CFG.rotate = v);
+
+    const dirR = document.getElementById('dirR'), dirL = document.getElementById('dirL');
+    dirR.onclick = () => { CFG.direction = 1;  velocity = 0; dirR.classList.add('on'); dirL.classList.remove('on'); };
+    dirL.onclick = () => { CFG.direction = -1; velocity = 0; dirL.classList.add('on'); dirR.classList.remove('on'); };
+
+    build();
+    tick(performance.now());
+    requestAnimationFrame(loop);
+    setInterval(() => { if (!document.hidden) tick(performance.now()); }, 33);
+  })();
+  </script>
+</body>
+</html>
