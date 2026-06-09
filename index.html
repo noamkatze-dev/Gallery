@@ -126,68 +126,6 @@
 
 <video id="webcam" autoplay muted playsinline></video>
 
-  <div class="ctrl">
-    <label>Direction</label>
-    <div class="seg">
-      <button id="dirR" class="on">Right</button>
-      <button id="dirL">Left</button>
-    </div>
-  </div>
-  <div class="ctrl">
-    <label>Cards <span id="vCount">40</span></label>
-    <input id="count" type="range" min="12" max="60" step="1" value="40">
-  </div>
-  <div class="ctrl">
-    <label>Card width <span id="vCardW">300px</span></label>
-    <input id="cardW" type="range" min="180" max="1920" step="5" value="300">
-  </div>
-  <div class="ctrl">
-    <label>Card height <span id="vCardH">200px</span></label>
-    <input id="cardH" type="range" min="120" max="1920" step="5" value="200">
-  </div>
-  <div class="ctrl">
-    <label>Tilt <span id="vTilt">-8°</span></label>
-    <input id="tilt" type="range" min="-30" max="10" step="1" value="-8">
-  </div>
-  <div class="ctrl">
-    <label>Rotate <span id="vRotate">0°</span></label>
-    <input id="rotate" type="range" min="-180" max="180" step="1" value="0">
-  </div>
-  <div class="ctrl">
-    <label>Proximity <span id="vProx">0.18</span></label>
-    <input id="prox" type="range" min="0.05" max="0.5" step="0.01" value="0.18">
-  </div>
-
-  <div class="divider"></div>
-
-  <div class="ctrl">
-    <label>Dot size <span id="vDotSize">5</span>px</label>
-    <input id="dotSize" type="range" min="2" max="20" step="1" value="5">
-  </div>
-  <div class="ctrl">
-    <label>Trail <span id="vTrail">80</span></label>
-    <input id="trail" type="range" min="10" max="300" step="5" value="80">
-  </div>
-  <div class="ctrl">
-    <label>Fade <span id="vFade">120</span>f</label>
-    <input id="fade" type="range" min="10" max="500" step="10" value="120">
-  </div>
-  <div class="ctrl">
-    <label>Smoothing <span id="vSmooth">0.10</span></label>
-    <input id="smooth" type="range" min="0.01" max="1" step="0.01" value="0.10">
-  </div>
-
-  <div class="divider"></div>
-
-  <div class="ctrl">
-    <label>Show camera</label>
-    <div class="seg">
-      <button id="camOn">Show</button>
-      <button id="camOff" class="on">Hide</button>
-    </div>
-  </div>
-</div>
-
 <script type="module">
 import { FaceLandmarker, FilesetResolver }
   from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
@@ -473,11 +411,8 @@ startCamera();
 
 
 
-dirL.onclick=()=>{CFG.direction=-1;velocity=0;dirL.classList.add('on');dirR.classList.remove('on');};
 
 
-document.getElementById('camOff').onclick=()=>{ webcamEl.classList.remove('show');
-  document.getElementById('camOff').classList.add('on'); document.getElementById('camOn').classList.remove('on'); };
 </script>
 </body>
 </html>
