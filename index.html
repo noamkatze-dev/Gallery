@@ -100,24 +100,7 @@
     object-fit: cover; border-radius: 8px; opacity: 0.3; z-index: 50; display: none; }
   #webcam.show { display: block; }
 
-  /* ── PANEL ── */
-  .panel {
-    position: fixed; top: 18px; right: 18px; width: 230px; z-index: 100;
-    background: rgba(10,10,16,.88); backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 16px 16px 8px;
-    color: #e8e8ee;
-  }
-  .panel h2 { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; opacity: .5; margin-bottom: 14px; }
-  .ctrl { margin-bottom: 12px; }
-  .ctrl label { display: flex; justify-content: space-between; font-size: 11px; opacity: .75; margin-bottom: 5px; }
-  .ctrl input[type=range] { width: 100%; accent-color: #9370DB; }
-  .seg { display: flex; gap: 5px; }
-  .seg button {
-    flex: 1; padding: 5px 0; font-size: 11px; border-radius: 7px; cursor: pointer;
-    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); color: #e8e8ee;
-  }
-  .seg button.on { background: #9370DB; border-color: #9370DB; color: #fff; }
-  .divider { height: 1px; background: rgba(255,255,255,.07); margin: 10px 0; }
+  
 </style>
 </head>
 <body>
@@ -143,14 +126,6 @@
 
 <video id="webcam" autoplay muted playsinline></video>
 
-<!-- panel -->
-<div class="panel">
-  <h2>Wheel + Tracking</h2>
-
-  <div class="ctrl">
-    <label>Spin speed <span id="vSpeed">7°/s</span></label>
-    <input id="speed" type="range" min="0" max="40" step="1" value="7">
-  </div>
   <div class="ctrl">
     <label>Direction</label>
     <div class="seg">
@@ -222,8 +197,8 @@ const COLORS = ['#E8756A','#7AB648','#9370DB','#F4A460','#5BA8E0','#E85A8A','#2E
 
 // ── WHEEL CONFIG ─────────────────────────────────────────────────────────────
 const CFG = {
-  count: 40, inner: 18, cardW: 300, cardH: 200,
-  tilt: -8, speed: 7, direction: 1, rotate: 0,
+  count: 45, inner: 18, cardW: 575, cardH: 910,
+  tilt: 0, speed: 10, direction: 1, rotate: 90,
   proxThreshold: 0.18,
 };
 
@@ -493,41 +468,14 @@ async function startCamera() {
 startCamera();
 
 // ── PANEL CONTROLS ────────────────────────────────────────────────────────────
-const bind = (id, valId, handler) => {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.addEventListener('input', e => {
-    const display = handler(e.target.value);
-    const valEl = document.getElementById(valId);
-    if (valEl && display !== undefined) valEl.textContent = display;
-  });
-};
 
-bind('speed',   'vSpeed',   v => { CFG.speed   = parseFloat(v); return v + '°/s'; });
-bind('count',   'vCount',   v => { CFG.count   = parseInt(v);   build(); return v; });
-bind('cardW',   'vCardW',   v => { CFG.cardW   = parseInt(v);   build(); return v + 'px'; });
-bind('cardH',   'vCardH',   v => { CFG.cardH   = parseInt(v);   build(); return v + 'px'; });
-bind('tilt',    'vTilt',    v => { CFG.tilt    = parseFloat(v); return v + '°'; });
-bind('rotate',  'vRotate',  v => { CFG.rotate  = parseFloat(v); return v + '°'; });
-bind('prox',    'vProx',    v => { PROX        = parseFloat(v); return parseFloat(v).toFixed(2); });
-bind('dotSize', 'vDotSize', v => { TRK.dotSize = parseInt(v);   return v + 'px'; });
-bind('trail',   'vTrail',   v => { TRK.trail   = parseInt(v);   return v; });
-bind('fade',    'vFade',    v => { TRK.fade    = parseInt(v);   return v + 'f'; });
-bind('smooth',  'vSmooth',  v => { TRK.smooth  = parseFloat(v); return parseFloat(v).toFixed(2); });
 
-document.getElementById('vCardW').textContent = CFG.cardW + 'px';
-document.getElementById('vCardH').textContent = CFG.cardH + 'px';
-document.getElementById('vSpeed').textContent  = CFG.speed + '°/s';
-document.getElementById('vTilt').textContent   = CFG.tilt + '°';
-document.getElementById('vRotate').textContent = CFG.rotate + '°';
-document.getElementById('vProx').textContent   = CFG.proxThreshold.toFixed(2);
 
-const dirR=document.getElementById('dirR'), dirL=document.getElementById('dirL');
-dirR.onclick=()=>{CFG.direction=1;velocity=0;dirR.classList.add('on');dirL.classList.remove('on');};
+
+
 dirL.onclick=()=>{CFG.direction=-1;velocity=0;dirL.classList.add('on');dirR.classList.remove('on');};
 
-document.getElementById('camOn').onclick =()=>{ webcamEl.classList.add('show');
-  document.getElementById('camOn').classList.add('on'); document.getElementById('camOff').classList.remove('on'); };
+
 document.getElementById('camOff').onclick=()=>{ webcamEl.classList.remove('show');
   document.getElementById('camOff').classList.add('on'); document.getElementById('camOn').classList.remove('on'); };
 </script>
