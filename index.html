@@ -331,21 +331,19 @@ resizeDotCanvas();
 window.addEventListener('resize', resizeDotCanvas);
 
 function addDot(nx, ny) {
-  if (!overlayOpen) return; // only when image is showing
-  dots.push({ x: nx * dotCanvas.width, y: ny * dotCanvas.height, age: 0 });
+  if (!overlayOpen) return;
+  dots.push({ x: nx * dotCanvas.width, y: ny * dotCanvas.height });
   while (dots.length > TRK.trail) dots.shift();
 }
 
 function drawDots() {
   dotCtx.clearRect(0, 0, dotCanvas.width, dotCanvas.height);
   if (!overlayOpen) { requestAnimationFrame(drawDots); return; }
+  // Exact gaze style: fixed red dots, no fade — just draw all accumulated points
+  dotCtx.fillStyle = 'rgba(255,0,3,0.9)';
   for (const dot of dots) {
-    dot.age++;
-    const alpha = Math.max(0, 1 - dot.age / TRK.fade) * TRK.opacity;
-    if (alpha <= 0.01) continue;
     dotCtx.beginPath();
     dotCtx.arc(dot.x, dot.y, TRK.dotSize, 0, Math.PI * 2);
-    dotCtx.fillStyle = `rgba(255,0,3,${alpha.toFixed(3)})`;
     dotCtx.fill();
   }
   requestAnimationFrame(drawDots);
