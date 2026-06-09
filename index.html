@@ -131,7 +131,11 @@ import { FaceLandmarker, FilesetResolver }
   from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
 
 // ── COLORS ────────────────────────────────────────────────────────────────────
-const COLORS = ['#E8756A','#7AB648','#9370DB','#F4A460','#5BA8E0','#E85A8A','#2EC4A6','#F2C14E'];
+const IMAGES = [
+  'Politics 1.png','Politics 2.png','Politics 3.png',
+  'Politics 4.png','Politics 5.png','Politics 6.png',
+  'Politics 7.png','Politics 8.png','Politics 9.png',
+];
 
 // ── WHEEL CONFIG ─────────────────────────────────────────────────────────────
 const CFG = {
@@ -153,16 +157,19 @@ function build() {
   const R = CFG.inner + CFG.cardW / 2;
   for (let i = 0; i < CFG.count; i++) {
     const a = (i / CFG.count) * 360;
+    const src = IMAGES[i % IMAGES.length];
     const b = document.createElement('div');
     b.className = 'blade';
     b.style.cssText = `width:${CFG.cardW}px;height:${CFG.cardH}px;margin-left:${-CFG.cardW/2}px;margin-top:${-CFG.cardH/2}px;`;
     b.style.transform = `rotateY(${a - 90}deg) translateX(${R}px)`;
-    const color = COLORS[i % COLORS.length];
-    ['face','face back'].forEach((cls, fi) => {
+    ['face', 'face back'].forEach((cls) => {
       const f = document.createElement('div');
       f.className = cls;
-      f.style.background = color;
-      f.dataset.color = color;
+      const img = document.createElement('img');
+      img.src = src;
+      img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;';
+      f.appendChild(img);
+      f.dataset.color = src;
       b.appendChild(f);
     });
     ring.appendChild(b);
@@ -238,8 +245,15 @@ function openOverlay() {
   if (overlayOpen) return;
   overlayOpen = true;
   const center = getCenterCard();
-  const color  = center?.el.querySelector('.face')?.dataset.color || '#9370DB';
-  overlayCol.style.background = color;
+  const src = center?.el.querySelector('.face')?.dataset.color || '';
+  if (src && src.endsWith('.png')) {
+    overlayCol.style.background = '';
+    overlayCol.style.backgroundImage = `url('${src}')`;
+    overlayCol.style.backgroundSize = 'cover';
+    overlayCol.style.backgroundPosition = 'center';
+  } else {
+    overlayCol.style.background = src || '#9370DB';
+  }
   overlay.style.opacity = '1';
   overlay.classList.add('open');
   dots.length = 0;
