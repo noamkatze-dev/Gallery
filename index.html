@@ -1,101 +1,177 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Head Tracking — Gaze Dots</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Proximity Wheel + Head Tracking</title>
 <style>
-  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
-  html,body{width:100%;height:100%;overflow:hidden;background:#0a0a0c;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; font-family: sans-serif; }
 
-  /* ── CANVAS (fills screen, draws dots) ── */
-  #dotCanvas{
-    position:fixed;inset:0;
-    width:100%;height:100%;
-    pointer-events:none;
-    z-index:10;
+  /* ── WHEEL ── */
+  #stage {
+    position: fixed; inset: 0;
+    perspective: 1500px;
+    perspective-origin: 50% 48%;
+    cursor: grab; touch-action: none;
+    z-index: 1;
+  }
+  #stage.dragging { cursor: grabbing; }
+  #ring {
+    position: absolute; left: 50%; top: 50%;
+    width: 0; height: 0;
+    transform-style: preserve-3d;
+  }
+  .blade { position: absolute; transform-style: preserve-3d; will-change: transform, opacity; }
+  .face {
+    position: absolute; inset: 0;
+    overflow: hidden;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  }
+  .face.back { transform: rotateY(180deg); }
+
+  /* ── FULLSCREEN OVERLAY ── */
+  #overlay {
+    position: fixed; inset: 0;
+    z-index: 10;
+    pointer-events: none;
+    opacity: 0;
+  }
+  #overlay.open { pointer-events: all; }
+  #overlay-bg {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0);
+    transition: background 0.7s ease;
+  }
+  #overlay.open #overlay-bg { background: rgba(0,0,0,0.1); }
+  #overlay-card {
+    position: absolute;
+    left: 0; right: 0;
+    bottom: -100%;
+    width: 100%; height: 100%;
+    transition: bottom 0.7s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  #overlay.open #overlay-card { bottom: 0; }
+  #overlay-color {
+    position: absolute; inset: 0;
   }
 
-  /* ── BACKGROUND IMAGE SLOT ── */
-  #bg{
-    position:fixed;inset:0;
-    width:100%;height:100%;
-    object-fit:cover;
-    opacity:0.55;
-    display:none;
+  /* ── DOT CANVAS (over the overlay) ── */
+  #dotCanvas {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 2;
+    /* fully transparent — only red dots drawn */
   }
 
-  /* ── STATUS BAR ── */
-  #status{
-    position:fixed;top:20px;left:50%;transform:translateX(-50%);
-    z-index:50;
-    display:flex;align-items:center;gap:10px;
-    background:rgba(0,0,0,0.65);backdrop-filter:blur(10px);
-    padding:8px 18px;border-radius:100px;
-    color:#fff;font-size:12px;font-weight:600;letter-spacing:0.08em;
-    pointer-events:none;
+  /* ── STATUS ── */
+  #status {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    z-index: 100;
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(10px);
+    padding: 8px 18px; border-radius: 100px;
+    color: #fff; font-size: 12px; font-weight: 600; letter-spacing: 0.08em;
+    pointer-events: none; transition: opacity 0.5s;
   }
-  #status-dot{width:8px;height:8px;border-radius:50%;background:#444;transition:background 0.3s;}
-  #status-dot.loading{background:#f59e0b;animation:blink 1s infinite;}
-  #status-dot.active{background:#4ade80;}
-  #status-dot.error{background:#ef4444;}
-  @keyframes blink{0%,100%{opacity:1;}50%{opacity:0.3;}}
+  #status-dot { width: 8px; height: 8px; border-radius: 50%; background: #444; transition: background 0.3s; }
+  #status-dot.loading { background: #f59e0b; animation: blink 1s infinite; }
+  #status-dot.near    { background: #f59e0b; }
+  #status-dot.active  { background: #4ade80; }
+  #status-dot.open    { background: #FF0003; animation: blink 0.8s infinite; }
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
-  /* ── HIDDEN WEBCAM ── */
-  #webcam{position:fixed;bottom:8px;right:8px;width:120px;height:90px;
-    object-fit:cover;border-radius:8px;opacity:0.3;z-index:20;display:none;}
-  #webcam.show{display:block;}
+  #webcam { position: fixed; bottom: 8px; right: 8px; width: 120px; height: 90px;
+    object-fit: cover; border-radius: 8px; opacity: 0.3; z-index: 50; display: none; }
+  #webcam.show { display: block; }
 
   /* ── PANEL ── */
-  .panel{
-    position:fixed;top:18px;right:18px;width:240px;z-index:50;
-    background:rgba(15,15,20,.88);backdrop-filter:blur(12px);
-    border:1px solid rgba(255,255,255,.08);border-radius:16px;
-    padding:16px 16px 10px;color:#e8e8ee;
+  .panel {
+    position: fixed; top: 18px; right: 18px; width: 230px; z-index: 100;
+    background: rgba(10,10,16,.88); backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,.08); border-radius: 16px; padding: 16px 16px 8px;
+    color: #e8e8ee;
   }
-  .panel h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.5;margin-bottom:14px;}
-  .ctrl{margin-bottom:12px;}
-  .ctrl label{display:flex;justify-content:space-between;font-size:11px;opacity:.75;margin-bottom:5px;}
-  .ctrl input[type=range]{width:100%;accent-color:#FF0003;}
-  .ctrl input[type=file]{font-size:11px;color:#aaa;width:100%;}
-  .seg{display:flex;gap:5px;}
-  .seg button{
-    flex:1;padding:5px 0;font-size:11px;border-radius:7px;cursor:pointer;
-    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:#e8e8ee;
+  .panel h2 { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; opacity: .5; margin-bottom: 14px; }
+  .ctrl { margin-bottom: 12px; }
+  .ctrl label { display: flex; justify-content: space-between; font-size: 11px; opacity: .75; margin-bottom: 5px; }
+  .ctrl input[type=range] { width: 100%; accent-color: #9370DB; }
+  .seg { display: flex; gap: 5px; }
+  .seg button {
+    flex: 1; padding: 5px 0; font-size: 11px; border-radius: 7px; cursor: pointer;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); color: #e8e8ee;
   }
-  .seg button.on{background:#FF0003;border-color:#FF0003;color:#fff;}
-  .divider{height:1px;background:rgba(255,255,255,.07);margin:10px 0;}
+  .seg button.on { background: #9370DB; border-color: #9370DB; color: #fff; }
+  .divider { height: 1px; background: rgba(255,255,255,.07); margin: 10px 0; }
 </style>
 </head>
 <body>
 
-<img id="bg" src="" alt=""/>
-<canvas id="dotCanvas"></canvas>
+<div id="stage"><div id="ring"></div></div>
 
+<!-- fullscreen color card -->
+<div id="overlay">
+  <div id="overlay-bg"></div>
+  <div id="overlay-card">
+    <div id="overlay-color"></div>
+    <!-- head tracking dots drawn here -->
+    <canvas id="dotCanvas"></canvas>
+  </div>
+</div>
+
+<!-- status -->
 <div id="status">
   <div id="status-dot" class="loading"></div>
-  <span id="status-text">Loading MediaPipe…</span>
+  <span id="status-text">Loading camera…</span>
 </div>
 
 <video id="webcam" autoplay muted playsinline></video>
 
+<!-- panel -->
 <div class="panel">
-  <h2>Head Tracking</h2>
+  <h2>Wheel + Tracking</h2>
 
   <div class="ctrl">
-    <label>Dot size <span id="vDotSize">5</span></label>
+    <label>Spin speed <span id="vSpeed">7°/s</span></label>
+    <input id="speed" type="range" min="0" max="40" step="1" value="7">
+  </div>
+  <div class="ctrl">
+    <label>Direction</label>
+    <div class="seg">
+      <button id="dirR" class="on">Right</button>
+      <button id="dirL">Left</button>
+    </div>
+  </div>
+  <div class="ctrl">
+    <label>Cards <span id="vCount">40</span></label>
+    <input id="count" type="range" min="12" max="60" step="1" value="40">
+  </div>
+  <div class="ctrl">
+    <label>Card width <span id="vCardW">300px</span></label>
+    <input id="cardW" type="range" min="180" max="1920" step="5" value="300">
+  </div>
+  <div class="ctrl">
+    <label>Card height <span id="vCardH">200px</span></label>
+    <input id="cardH" type="range" min="120" max="1920" step="5" value="200">
+  </div>
+  <div class="ctrl">
+    <label>Proximity <span id="vProx">0.18</span></label>
+    <input id="prox" type="range" min="0.05" max="0.5" step="0.01" value="0.18">
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="ctrl">
+    <label>Dot size <span id="vDotSize">5</span>px</label>
     <input id="dotSize" type="range" min="2" max="20" step="1" value="5">
   </div>
   <div class="ctrl">
-    <label>Dot opacity <span id="vDotOpacity">0.9</span></label>
-    <input id="dotOpacity" type="range" min="0.1" max="1" step="0.05" value="0.9">
-  </div>
-  <div class="ctrl">
-    <label>Trail length <span id="vTrail">80</span></label>
+    <label>Trail <span id="vTrail">80</span></label>
     <input id="trail" type="range" min="10" max="300" step="5" value="80">
   </div>
   <div class="ctrl">
-    <label>Fade speed <span id="vFade">120</span> frames</label>
+    <label>Fade <span id="vFade">120</span>f</label>
     <input id="fade" type="range" min="10" max="500" step="10" value="120">
   </div>
   <div class="ctrl">
@@ -106,20 +182,11 @@
   <div class="divider"></div>
 
   <div class="ctrl">
-    <label>Show webcam</label>
+    <label>Show camera</label>
     <div class="seg">
       <button id="camOn">Show</button>
       <button id="camOff" class="on">Hide</button>
     </div>
-  </div>
-
-  <div class="ctrl">
-    <label>Background image</label>
-    <input id="bgFile" type="file" accept="image/*">
-  </div>
-  <div class="ctrl">
-    <label>BG opacity <span id="vBgOp">0.55</span></label>
-    <input id="bgOp" type="range" min="0" max="1" step="0.05" value="0.55">
   </div>
 </div>
 
@@ -127,79 +194,188 @@
 import { FaceLandmarker, FilesetResolver }
   from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
 
-// ── CONFIG ────────────────────────────────────────────────────────────────────
+// ── COLORS ────────────────────────────────────────────────────────────────────
+const COLORS = ['#E8756A','#7AB648','#9370DB','#F4A460','#5BA8E0','#E85A8A','#2EC4A6','#F2C14E'];
+
+// ── WHEEL CONFIG ─────────────────────────────────────────────────────────────
 const CFG = {
-  dotSize:    5,
-  dotOpacity: 0.9,
-  trail:      80,
-  fade:       120,
-  smooth:     0.10,
+  count: 40, inner: 18, cardW: 300, cardH: 200,
+  tilt: -8, speed: 7, direction: 1, rotate: 0,
+  proxThreshold: 0.18,
 };
 
-// ── CANVAS ────────────────────────────────────────────────────────────────────
-const canvas = document.getElementById('dotCanvas');
-const ctx    = canvas.getContext('2d');
+// ── TRACKING CONFIG ───────────────────────────────────────────────────────────
+const TRK = { dotSize: 5, trail: 80, fade: 120, smooth: 0.10, opacity: 0.92 };
 
-function resizeCanvas() {
-  canvas.width  = window.innerWidth;
-  canvas.height = window.innerHeight;
+// ── WHEEL ─────────────────────────────────────────────────────────────────────
+const stage = document.getElementById('stage');
+const ring  = document.getElementById('ring');
+let blades  = [];
+
+function build() {
+  ring.innerHTML = ''; blades = [];
+  const R = CFG.inner + CFG.cardW / 2;
+  for (let i = 0; i < CFG.count; i++) {
+    const a = (i / CFG.count) * 360;
+    const b = document.createElement('div');
+    b.className = 'blade';
+    b.style.cssText = `width:${CFG.cardW}px;height:${CFG.cardH}px;margin-left:${-CFG.cardW/2}px;margin-top:${-CFG.cardH/2}px;`;
+    b.style.transform = `rotateY(${a - 90}deg) translateX(${R}px)`;
+    const color = COLORS[i % COLORS.length];
+    ['face','face back'].forEach((cls, fi) => {
+      const f = document.createElement('div');
+      f.className = cls;
+      f.style.background = color;
+      f.dataset.color = color;
+      b.appendChild(f);
+    });
+    ring.appendChild(b);
+    blades.push({ el: b, a });
+  }
 }
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
+build();
 
-// ── DOT TRAIL ─────────────────────────────────────────────────────────────────
-// Each dot: { x, y, age }  — age increments each frame, fades out
-const dots = [];
-let smoothX = 0.5, smoothY = 0.5;  // normalized
-let hasHead = false;
+// ── SPIN ──────────────────────────────────────────────────────────────────────
+let spin = 0, velocity = 0, dragging = false, last = performance.now();
+let wheelFrozen = false;
+
+function applyOpacity() {
+  for (const bl of blades) {
+    const p = (bl.a + spin) * Math.PI / 180;
+    const c = Math.cos(p);
+    const op = c > -0.15 ? 1 : Math.max(0, 1 + (c + 0.15) * 2.2);
+    bl.el.style.opacity = op.toFixed(3);
+  }
+}
+
+function tick(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!wheelFrozen && !dragging) {
+    if (Math.abs(velocity) > 0.01) {
+      spin += velocity * dt;
+      velocity *= Math.pow(0.12, dt);
+      if (Math.abs(velocity) < CFG.speed) velocity = 0;
+    } else {
+      spin += CFG.speed * CFG.direction * dt;
+    }
+  }
+  ring.style.transform = `rotateZ(${CFG.rotate}deg) rotateX(${CFG.tilt}deg) rotateY(${spin}deg)`;
+  applyOpacity();
+}
+function loop(now) { tick(now); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+
+// ── DRAG ──────────────────────────────────────────────────────────────────────
+let downX=0, downSpin=0, lastX=0, lastT=0;
+stage.addEventListener('pointerdown', e => {
+  if (wheelFrozen) return;
+  dragging=true; velocity=0; downX=lastX=e.clientX; downSpin=spin; lastT=performance.now();
+  stage.classList.add('dragging'); stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  spin = downSpin + (e.clientX - downX) * 0.35;
+  const now=performance.now(), dt=(now-lastT)/1000;
+  if (dt>0) velocity=((e.clientX-lastX)*0.35)/dt;
+  lastX=e.clientX; lastT=now;
+});
+['pointerup','pointercancel'].forEach(ev =>
+  stage.addEventListener(ev, () => { if(!dragging)return; dragging=false; stage.classList.remove('dragging'); })
+);
+
+// ── OVERLAY ───────────────────────────────────────────────────────────────────
+const overlay     = document.getElementById('overlay');
+const overlayCol  = document.getElementById('overlay-color');
+let overlayOpen   = false;
+
+function getCenterCard() {
+  let best=null, bestDist=Infinity;
+  for (const bl of blades) {
+    let eff = ((bl.a + spin) % 360 + 360) % 360;
+    if (eff > 180) eff -= 360;
+    if (Math.abs(eff) < bestDist) { bestDist=Math.abs(eff); best=bl; }
+  }
+  return best;
+}
+
+function openOverlay() {
+  if (overlayOpen) return;
+  overlayOpen = true;
+  const center = getCenterCard();
+  const color  = center?.el.querySelector('.face')?.dataset.color || '#9370DB';
+  overlayCol.style.background = color;
+  overlay.style.opacity = '1';
+  overlay.classList.add('open');
+  dots.length = 0; // clear dots when new image opens
+}
+
+function closeOverlay() {
+  if (!overlayOpen) return;
+  overlayOpen = false;
+  overlay.classList.remove('open');
+  dots.length = 0;
+  setTimeout(() => { overlay.style.opacity = '0'; }, 700);
+}
+
+// ── DOT CANVAS ────────────────────────────────────────────────────────────────
+const dotCanvas = document.getElementById('dotCanvas');
+const dotCtx    = dotCanvas.getContext('2d');
+const dots      = [];
+let smoothX = 0.5, smoothY = 0.5;
+
+function resizeDotCanvas() {
+  dotCanvas.width  = window.innerWidth;
+  dotCanvas.height = window.innerHeight;
+}
+resizeDotCanvas();
+window.addEventListener('resize', resizeDotCanvas);
 
 function addDot(nx, ny) {
-  dots.push({ x: nx * canvas.width, y: ny * canvas.height, age: 0 });
-  // trim trail
-  while (dots.length > CFG.trail) dots.shift();
+  if (!overlayOpen) return; // only when image is showing
+  dots.push({ x: nx * dotCanvas.width, y: ny * dotCanvas.height, age: 0 });
+  while (dots.length > TRK.trail) dots.shift();
 }
 
 function drawDots() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  dotCtx.clearRect(0, 0, dotCanvas.width, dotCanvas.height);
+  if (!overlayOpen) { requestAnimationFrame(drawDots); return; }
   for (const dot of dots) {
     dot.age++;
-    const alpha = Math.max(0, 1 - dot.age / CFG.fade) * CFG.dotOpacity;
-    if (alpha <= 0) continue;
-    ctx.beginPath();
-    ctx.arc(dot.x, dot.y, CFG.dotSize, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255,0,3,${alpha.toFixed(3)})`;
-    ctx.fill();
+    const alpha = Math.max(0, 1 - dot.age / TRK.fade) * TRK.opacity;
+    if (alpha <= 0.01) continue;
+    dotCtx.beginPath();
+    dotCtx.arc(dot.x, dot.y, TRK.dotSize, 0, Math.PI * 2);
+    dotCtx.fillStyle = `rgba(255,0,3,${alpha.toFixed(3)})`;
+    dotCtx.fill();
   }
+  requestAnimationFrame(drawDots);
 }
+requestAnimationFrame(drawDots);
 
-// ── HEAD POSITION FROM LANDMARKS ─────────────────────────────────────────────
-// Use nose tip (landmark 1) + forehead (168) + chin (152) + cheeks (234, 454)
-// weighted centroid → stable screen coordinate
+// ── HEAD CENTER ───────────────────────────────────────────────────────────────
 function headCenter(lm) {
   const pts = [
-    { lm: lm[1],   w: 4 },  // nose tip
-    { lm: lm[168], w: 1 },  // forehead
-    { lm: lm[152], w: 1 },  // chin
-    { lm: lm[234], w: 1 },  // left cheek
-    { lm: lm[454], w: 1 },  // right cheek
+    { p: lm[1],   w: 4 },
+    { p: lm[168], w: 1 },
+    { p: lm[152], w: 1 },
+    { p: lm[234], w: 1 },
+    { p: lm[454], w: 1 },
   ];
-  let wx = 0, wy = 0, wt = 0;
-  for (const { lm: p, w } of pts) {
-    wx += (1 - p.x) * w;   // mirror: webcam is mirrored
-    wy += p.y * w;
-    wt += w;
-  }
-  return { x: wx / wt, y: wy / wt };
+  let wx=0, wy=0, wt=0;
+  for (const { p, w } of pts) { wx+=(1-p.x)*w; wy+=p.y*w; wt+=w; }
+  return { x: wx/wt, y: wy/wt };
 }
 
 // ── MEDIAPIPE ─────────────────────────────────────────────────────────────────
 const statusDot  = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
 const webcamEl   = document.getElementById('webcam');
+let PROX = CFG.proxThreshold;
+const CLOSE_FRAMES = 8, FAR_FRAMES = 20;
+let closeFrames=0, farFrames=0, personClose=false;
 
-async function start() {
+async function startCamera() {
   try {
-    statusText.textContent = 'Loading model…';
     const fs = await FilesetResolver.forVisionTasks(
       'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
     );
@@ -213,35 +389,58 @@ async function start() {
       numFaces: 1,
     });
 
-    statusText.textContent = 'Requesting camera…';
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } }
+      video: { facingMode:'user', width:{ideal:320}, height:{ideal:240} }
     });
     webcamEl.srcObject = stream;
     await new Promise(r => { webcamEl.onloadeddata = r; });
-
     statusDot.className = 'active';
-    statusText.textContent = 'Tracking…';
+    statusText.textContent = 'Camera active — approach to open';
 
     let lastT = -1;
-
-    // ── TRACKING LOOP ──
     function track() {
       if (webcamEl.readyState >= 2 && webcamEl.currentTime !== lastT) {
         lastT = webcamEl.currentTime;
         try {
           const res = fl.detectForVideo(webcamEl, performance.now());
-          if (res.faceLandmarks?.length > 0) {
-            hasHead = true;
-            const { x, y } = headCenter(res.faceLandmarks[0]);
-            // smooth
-            smoothX += (x - smoothX) * CFG.smooth;
-            smoothY += (y - smoothY) * CFG.smooth;
+          const lms = res.faceLandmarks;
+
+          if (lms?.length > 0) {
+            const lm = lms[0];
+
+            // ── proximity detection ──
+            const faceWidth = Math.abs(lm[454].x - lm[234].x);
+            const isClose = faceWidth >= PROX;
+            if (isClose) { closeFrames++; farFrames=0; }
+            else         { farFrames++;   closeFrames=0; }
+
+            if (!personClose && closeFrames >= CLOSE_FRAMES) {
+              personClose=true; wheelFrozen=true;
+              openOverlay();
+              statusDot.className='open';
+              statusText.textContent='Tracking head…';
+            }
+            if (personClose && farFrames >= FAR_FRAMES) {
+              personClose=false; wheelFrozen=false;
+              closeOverlay();
+              statusDot.className='active';
+              statusText.textContent='Camera active — approach to open';
+            }
+
+            // ── head tracking dots ──
+            const { x, y } = headCenter(lm);
+            smoothX += (x - smoothX) * TRK.smooth;
+            smoothY += (y - smoothY) * TRK.smooth;
             addDot(smoothX, smoothY);
-            statusText.textContent = `Head: ${(smoothX*100).toFixed(0)}%, ${(smoothY*100).toFixed(0)}%`;
+
           } else {
-            hasHead = false;
-            statusText.textContent = 'No face detected';
+            closeFrames=0; farFrames++;
+            if (personClose && farFrames >= FAR_FRAMES) {
+              personClose=false; wheelFrozen=false;
+              closeOverlay();
+              statusDot.className='active';
+              statusText.textContent='Camera active — approach to open';
+            }
           }
         } catch(_) {}
       }
@@ -250,59 +449,43 @@ async function start() {
     requestAnimationFrame(track);
 
   } catch(e) {
-    statusDot.className = 'error';
-    statusText.textContent = 'Camera error: ' + e.message;
-    console.error(e);
+    statusDot.className='error';
+    statusText.textContent='Camera unavailable';
   }
 }
+startCamera();
 
-start();
-
-// ── RENDER LOOP ───────────────────────────────────────────────────────────────
-function renderLoop() {
-  drawDots();
-  requestAnimationFrame(renderLoop);
-}
-requestAnimationFrame(renderLoop);
-
-// ── CONTROLS ─────────────────────────────────────────────────────────────────
-function bind(id, valId, parse, key) {
-  const el = document.getElementById(id);
-  el.addEventListener('input', () => {
-    const v = parse(el.value);
-    if (valId) document.getElementById(valId).textContent = v;
-    CFG[key] = v;
+// ── PANEL CONTROLS ────────────────────────────────────────────────────────────
+const bind = (id, valId, parse, fn) => {
+  document.getElementById(id).addEventListener('input', e => {
+    const v = parse(e.target.value);
+    if (valId) document.getElementById(valId).textContent =
+      typeof v === 'number' && v % 1 !== 0 ? v.toFixed(2) : v;
+    fn(v);
   });
-}
-bind('dotSize',    'vDotSize',    v => parseInt(v),    'dotSize');
-bind('dotOpacity', 'vDotOpacity', v => parseFloat(v),  'dotOpacity');
-bind('trail',      'vTrail',      v => parseInt(v),    'trail');
-bind('fade',       'vFade',       v => parseInt(v),    'fade');
-bind('smooth',     'vSmooth',     v => parseFloat(v),  'smooth');
-
-const bgEl = document.getElementById('bg');
-document.getElementById('bgFile').addEventListener('change', e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  bgEl.src = URL.createObjectURL(file);
-  bgEl.style.display = 'block';
-});
-document.getElementById('bgOp').addEventListener('input', e => {
-  const v = parseFloat(e.target.value);
-  document.getElementById('vBgOp').textContent = v;
-  bgEl.style.opacity = v;
-});
-
-document.getElementById('camOn').onclick  = () => {
-  webcamEl.classList.add('show');
-  document.getElementById('camOn').classList.add('on');
-  document.getElementById('camOff').classList.remove('on');
 };
-document.getElementById('camOff').onclick = () => {
-  webcamEl.classList.remove('show');
-  document.getElementById('camOff').classList.add('on');
-  document.getElementById('camOn').classList.remove('on');
-};
+
+bind('speed',   'vSpeed',   v=>parseFloat(v), v=>CFG.speed=v);
+bind('count',   'vCount',   v=>parseInt(v),   v=>{CFG.count=v;build();});
+bind('cardW',   'vCardW',   v=>parseInt(v),   v=>{CFG.cardW=v;build();}, );
+bind('cardH',   'vCardH',   v=>parseInt(v),   v=>{CFG.cardH=v;build();});
+bind('prox',    'vProx',    v=>parseFloat(v), v=>PROX=v);
+bind('dotSize', 'vDotSize', v=>parseInt(v),   v=>TRK.dotSize=v);
+bind('trail',   'vTrail',   v=>parseInt(v),   v=>TRK.trail=v);
+bind('fade',    'vFade',    v=>parseInt(v),   v=>TRK.fade=v);
+bind('smooth',  'vSmooth',  v=>parseFloat(v), v=>TRK.smooth=v);
+
+document.getElementById('vCardW').textContent = CFG.cardW+'px';
+document.getElementById('vCardH').textContent = CFG.cardH+'px';
+
+const dirR=document.getElementById('dirR'), dirL=document.getElementById('dirL');
+dirR.onclick=()=>{CFG.direction=1;velocity=0;dirR.classList.add('on');dirL.classList.remove('on');};
+dirL.onclick=()=>{CFG.direction=-1;velocity=0;dirL.classList.add('on');dirR.classList.remove('on');};
+
+document.getElementById('camOn').onclick =()=>{ webcamEl.classList.add('show');
+  document.getElementById('camOn').classList.add('on'); document.getElementById('camOff').classList.remove('on'); };
+document.getElementById('camOff').onclick=()=>{ webcamEl.classList.remove('show');
+  document.getElementById('camOff').classList.add('on'); document.getElementById('camOn').classList.remove('on'); };
 </script>
 </body>
 </html>
