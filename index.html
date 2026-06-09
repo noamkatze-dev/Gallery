@@ -493,29 +493,34 @@ async function startCamera() {
 startCamera();
 
 // ── PANEL CONTROLS ────────────────────────────────────────────────────────────
-const bind = (id, valId, parse, fn) => {
-  document.getElementById(id).addEventListener('input', e => {
-    const v = parse(e.target.value);
-    if (valId) document.getElementById(valId).textContent =
-      typeof v === 'number' && v % 1 !== 0 ? v.toFixed(2) : v;
-    fn(v);
+const bind = (id, valId, handler) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('input', e => {
+    const display = handler(e.target.value);
+    const valEl = document.getElementById(valId);
+    if (valEl && display !== undefined) valEl.textContent = display;
   });
 };
 
-bind('speed',   'vSpeed',   v=>parseFloat(v), v=>CFG.speed=v);
-bind('count',   'vCount',   v=>parseInt(v),   v=>{CFG.count=v;build();});
-bind('cardW',   'vCardW',   v=>parseInt(v),   v=>{CFG.cardW=v;build();}, );
-bind('cardH',   'vCardH',   v=>parseInt(v),   v=>{CFG.cardH=v;build();});
-bind('tilt',    'vTilt',    v=>v+'°',         v=>CFG.tilt=v);
-bind('rotate',  'vRotate',  v=>v+'°',         v=>CFG.rotate=v);
-bind('prox',    'vProx',    v=>parseFloat(v), v=>PROX=v);
-bind('dotSize', 'vDotSize', v=>parseInt(v),   v=>TRK.dotSize=v);
-bind('trail',   'vTrail',   v=>parseInt(v),   v=>TRK.trail=v);
-bind('fade',    'vFade',    v=>parseInt(v),   v=>TRK.fade=v);
-bind('smooth',  'vSmooth',  v=>parseFloat(v), v=>TRK.smooth=v);
+bind('speed',   'vSpeed',   v => { CFG.speed   = parseFloat(v); return v + '°/s'; });
+bind('count',   'vCount',   v => { CFG.count   = parseInt(v);   build(); return v; });
+bind('cardW',   'vCardW',   v => { CFG.cardW   = parseInt(v);   build(); return v + 'px'; });
+bind('cardH',   'vCardH',   v => { CFG.cardH   = parseInt(v);   build(); return v + 'px'; });
+bind('tilt',    'vTilt',    v => { CFG.tilt    = parseFloat(v); return v + '°'; });
+bind('rotate',  'vRotate',  v => { CFG.rotate  = parseFloat(v); return v + '°'; });
+bind('prox',    'vProx',    v => { PROX        = parseFloat(v); return parseFloat(v).toFixed(2); });
+bind('dotSize', 'vDotSize', v => { TRK.dotSize = parseInt(v);   return v + 'px'; });
+bind('trail',   'vTrail',   v => { TRK.trail   = parseInt(v);   return v; });
+bind('fade',    'vFade',    v => { TRK.fade    = parseInt(v);   return v + 'f'; });
+bind('smooth',  'vSmooth',  v => { TRK.smooth  = parseFloat(v); return parseFloat(v).toFixed(2); });
 
-document.getElementById('vCardW').textContent = CFG.cardW+'px';
-document.getElementById('vCardH').textContent = CFG.cardH+'px';
+document.getElementById('vCardW').textContent = CFG.cardW + 'px';
+document.getElementById('vCardH').textContent = CFG.cardH + 'px';
+document.getElementById('vSpeed').textContent  = CFG.speed + '°/s';
+document.getElementById('vTilt').textContent   = CFG.tilt + '°';
+document.getElementById('vRotate').textContent = CFG.rotate + '°';
+document.getElementById('vProx').textContent   = CFG.proxThreshold.toFixed(2);
 
 const dirR=document.getElementById('dirR'), dirL=document.getElementById('dirL');
 dirR.onclick=()=>{CFG.direction=1;velocity=0;dirR.classList.add('on');dirL.classList.remove('on');};
