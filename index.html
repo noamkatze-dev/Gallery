@@ -56,6 +56,20 @@
     position: absolute; inset: 0;
   }
 
+  /* ── HEAD CURSOR DOT (like gazeDot) ── */
+  #headDot {
+    position: fixed;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.85);
+    background: rgba(255,255,255,0.12);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 20;
+    display: none;
+    transition: none;
+  }
+
   /* ── DOT CANVAS (over the overlay) ── */
   #dotCanvas {
     position: absolute; inset: 0;
@@ -117,6 +131,7 @@
     <div id="overlay-color"></div>
     <!-- head tracking dots drawn here -->
     <canvas id="dotCanvas"></canvas>
+    <div id="headDot"></div>
   </div>
 </div>
 
@@ -306,14 +321,17 @@ function openOverlay() {
   overlayCol.style.background = color;
   overlay.style.opacity = '1';
   overlay.classList.add('open');
-  dots.length = 0; // clear dots when new image opens
+  dots.length = 0;
+  gazeLog.length = 0;
+  headDot.style.display = 'block';
 }
 
 function closeOverlay() {
   if (!overlayOpen) return;
   overlayOpen = false;
   overlay.classList.remove('open');
-  dots.length = 0;
+  gazeLog.length = 0;
+  headDot.style.display = 'none';
   setTimeout(() => { overlay.style.opacity = '0'; }, 700);
 }
 
@@ -330,20 +348,33 @@ function resizeDotCanvas() {
 resizeDotCanvas();
 window.addEventListener('resize', resizeDotCanvas);
 
+// Gaze log — accumulates screen positions while overlay is open
+const gazeLog = [];
+const headDot = document.getElementById('headDot');
+
+// Current smoothed screen position
+let screenX = 0, screenY = 0;
+
 function addDot(nx, ny) {
   if (!overlayOpen) return;
-  dots.push({ x: nx * dotCanvas.width, y: ny * dotCanvas.height });
-  while (dots.length > TRK.trail) dots.shift();
+  // Convert normalized to screen coords
+  screenX = nx * window.innerWidth;
+  screenY = ny * window.innerHeight;
+  // Move the white cursor dot (like gazeDot)
+  headDot.style.left = screenX + 'px';
+  headDot.style.top  = screenY + 'px';
+  // Add to gaze log (like animateGaze in reference)
+  gazeLog.push({ x: nx, y: ny });
 }
 
 function drawDots() {
   dotCtx.clearRect(0, 0, dotCanvas.width, dotCanvas.height);
   if (!overlayOpen) { requestAnimationFrame(drawDots); return; }
-  // Exact gaze style: fixed red dots, no fade — just draw all accumulated points
+  // Draw all accumulated red dots — exactly like staticGaze in reference
   dotCtx.fillStyle = 'rgba(255,0,3,0.9)';
-  for (const dot of dots) {
+  for (const p of gazeLog) {
     dotCtx.beginPath();
-    dotCtx.arc(dot.x, dot.y, TRK.dotSize, 0, Math.PI * 2);
+    dotCtx.arc(p.x * dotCanvas.width, p.y * dotCanvas.height, 5, 0, Math.PI * 2);
     dotCtx.fill();
   }
   requestAnimationFrame(drawDots);
