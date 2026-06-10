@@ -167,7 +167,7 @@ function build() {
       f.className = cls;
       const img = document.createElement('img');
       img.src = src;
-      img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;transform:rotate(-90deg);transform-origin:center center;';
+      img.style.cssText = `position:absolute;top:50%;left:50%;width:${CFG.cardH}px;height:${CFG.cardW}px;transform:translate(-50%,-50%) rotate(-90deg);object-fit:cover;display:block;`;
       f.appendChild(img);
       f.dataset.color = src;
       b.appendChild(f);
